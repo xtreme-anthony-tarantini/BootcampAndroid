@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="bootcamp.android.twieber"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+    <uses-sdk
+        android:minSdkVersion="8"
+        android:targetSdkVersion="17" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/twieber"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme" >
+        <activity
+            android:name="bootcamp.android.twieber.activity.TwieberActivity"
+            android:label="@string/title_activity_twieber_list" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+		<activity
+            android:name="bootcamp.android.twieber.activity.TwieberWebActivity"
+            android:label="@string/title_activity_twieber_web" />
+		
+        <service android:name="bootcamp.android.twieber.service.TwieberService" />
+
+        <provider
+            android:name="bootcamp.android.twieber.contentprovider.TwieberContentProvider"
+            android:authorities="bootcamp.android.twieber.contentprovider"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

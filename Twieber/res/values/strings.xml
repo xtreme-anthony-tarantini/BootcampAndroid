@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Twieber</string>
+    <string name="text_hint">#hashtag</string>
+    <string name="title_activity_twieber_web">Twieber</string>
+    <string name="title_activity_twieber_list">Twieber</string>
+    <string name="button_text">Link</string>
+    <string name="avatar_description">Profile Image</string>
+	<string name="seperator_description">Profile Image</string>
+    
+</resources>
