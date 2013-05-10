@@ -19,10 +19,11 @@ import org.json.JSONObject;
 import android.app.IntentService;
 import android.content.Intent;
 import android.content.ContentValues;
-//import android.util.Log;
+import android.util.Log;
+import android.database.Cursor;
 
 public class TwieberService extends IntentService {
-	//private static final String TAG = TwieberService.class.getName();
+	private static final String TAG = TwieberService.class.getName();
 		
 	//Declaring constants for messaging with Activity
 	public static final String HASH_TAG_IN = "hmsg";
@@ -33,19 +34,20 @@ public class TwieberService extends IntentService {
 	//Variables for comparing whether an insert is needed into the database
 	private String maxID;
 	private String newMaxID;
+	private Cursor cursor;
 	
 	//Constructor for the service
 	public TwieberService() {
 		super("TwieberService");
-	}
-	
+	}	
 	@Override
 	protected void onHandleIntent(Intent intent) {
 		//Extract information from intent
 		String msg = intent.getStringExtra(HASH_TAG_IN);
 		maxID = intent.getStringExtra(MAX_ID_IN);
 		//Create query
-		String apiQuery = "http://search.twitter.com/search.json?q=%23" + msg;
+		String apiQuery = getQuery(msg);
+		Log.d(TAG, apiQuery);
 		StringBuilder tweetFeedBuilder = new StringBuilder();
 		try{
 			//Begin forming HTTP request
@@ -64,34 +66,84 @@ public class TwieberService extends IntentService {
 				while((lineIn = tweetReader.readLine()) != null){
 					tweetFeedBuilder.append(lineIn);
 				}
-				try {
-					//Begin parsing the JSON response into pieces
-					JSONObject resultObject = new JSONObject(tweetFeedBuilder.toString());
-					newMaxID = resultObject.getString("max_id");
-					JSONArray tweetArray = resultObject.getJSONArray("results");
-					ContentValues values = new ContentValues();
-					for (int t = 0; t < tweetArray.length(); t++){
-						JSONObject tweetObject = tweetArray.getJSONObject(t);
-						//If id of this tweet is > max_id of last request, insert it
-						if (tweetObject.getString("id").compareTo(maxID) > 0){ 
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_USERNAME, tweetObject.getString("from_user"));
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_DATE, tweetObject.getString("created_at").replace(" +0000", ""));
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_IMAGE, tweetObject.getString("profile_image_url"));
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_HASHTAG, msg);
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_MESSAGE, tweetObject.getString("text"));
-							String source = tweetObject.getString("source");
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_SOURCE, source = source.substring(source.indexOf("&gt;"), source.lastIndexOf("&lt;")).replace("&gt;", ""));
-							values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_TWEETID, tweetObject.getString("id"));
-							this.getContentResolver().insert(TwieberContentDescriptor.TweetDesc.CONTENT_URI, values);
-						}
-					}
-				} catch(Exception e){
-					e.printStackTrace();
+				insertTweet(tweetFeedBuilder, msg);
+			}
+		} catch(Exception e){}
+		updateHash(msg, newMaxID);
+		sendIntent();
+	}
+	
+	//Queries for latest maxID if not expired
+	private String getQuery(String hashtag){
+		String storedMaxID;
+		String query = "http://search.twitter.com/search.json";
+		String[] projection = new String[]{
+				TwieberContentDescriptor.HashDesc.Columns.KEY_HASHID,
+				TwieberContentDescriptor.HashDesc.Columns.KEY_HASHTAG,
+				TwieberContentDescriptor.HashDesc.Columns.KEY_MAXID,
+				TwieberContentDescriptor.HashDesc.Columns.KEY_DATE};
+		cursor = this.getContentResolver().query(
+				TwieberContentDescriptor.HashDesc.CONTENT_URI, 
+				projection,
+				TwieberContentDescriptor.HashDesc.Columns.KEY_HASHTAG + " = ?" ,
+				new String[]{hashtag},
+				null);
+		if (cursor.moveToFirst()){
+			storedMaxID = cursor.getString(cursor.getColumnIndex(TwieberContentDescriptor.HashDesc.Columns.KEY_MAXID));
+			query = query + "?since_id=" + storedMaxID + "&q=%23" + hashtag + "&rpp=15";
+		} else {
+			query = query + "?q=%23" + hashtag + "";
+			insertHash(hashtag);
+		}
+		return query;
+	}
+	
+	//Inserts a parent record for this hashtag
+	private void insertHash(String hashtag){
+		ContentValues values = new ContentValues();
+		values.put(TwieberContentDescriptor.HashDesc.Columns.KEY_HASHTAG, hashtag);
+		values.put(TwieberContentDescriptor.HashDesc.Columns.KEY_MAXID, "0");
+		this.getContentResolver().insert(TwieberContentDescriptor.HashDesc.CONTENT_URI, values);
+	}
+	
+	//Updates parent record for this hashtag
+	private void updateHash(String hashtag, String maxID){
+		Log.d(TAG, "newMaxID: " + maxID);
+		ContentValues values = new ContentValues();
+		values.put(TwieberContentDescriptor.HashDesc.Columns.KEY_MAXID, maxID);
+		this.getContentResolver().update(TwieberContentDescriptor.HashDesc.CONTENT_URI, values, 
+				TwieberContentDescriptor.HashDesc.Columns.KEY_HASHTAG + " = ?", 
+				new String[]{hashtag});
+	}
+	
+	//Insert tweet into the database
+	private void insertTweet(StringBuilder tweetFeedBuilder, String msg){
+		try {
+			//Begin parsing the JSON response into pieces
+			JSONObject resultObject = new JSONObject(tweetFeedBuilder.toString());
+			newMaxID = resultObject.getString("max_id");
+			JSONArray tweetArray = resultObject.getJSONArray("results");
+			ContentValues values = new ContentValues();
+			for (int t = 0; t < tweetArray.length(); t++){
+				JSONObject tweetObject = tweetArray.getJSONObject(t);
+				//If id of this tweet is > max_id of last request, insert it
+				if (tweetObject.getString("id").compareTo(maxID) > 0){ 
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_USERNAME, tweetObject.getString("from_user"));
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_DATE, tweetObject.getString("created_at").replace(" +0000", ""));
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_IMAGE, tweetObject.getString("profile_image_url"));
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_HASHTAG, msg);
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_MESSAGE, tweetObject.getString("text"));
+					String source = tweetObject.getString("source");
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_SOURCE, source = source.substring(source.indexOf("&gt;"), source.lastIndexOf("&lt;")).replace("&gt;", ""));
+					values.put(TwieberContentDescriptor.TweetDesc.Columns.KEY_TWEETID, tweetObject.getString("id"));
+					this.getContentResolver().insert(TwieberContentDescriptor.TweetDesc.CONTENT_URI, values);
 				}
 			}
-		} catch(Exception e){
-			e.printStackTrace();
-		}
+		} catch(Exception e){}
+	}
+	
+	//Create and send intent back to activity
+	private void sendIntent(){
 		//Send intent back to Activity stating the fetch has been completed
 		Intent broadcastIntent = new Intent();
 		broadcastIntent.setAction(UpdateReceiver.UPDATE_LIST);

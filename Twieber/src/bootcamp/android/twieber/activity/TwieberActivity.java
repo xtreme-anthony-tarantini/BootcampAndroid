@@ -19,7 +19,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.AsyncTask;
-//import android.util.Log;
+import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.view.MenuItem;
@@ -31,7 +31,7 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 
 public class TwieberActivity extends ListActivity {
-	//private static final String TAG = TwieberActivity.class.getName();
+	private static final String TAG = TwieberActivity.class.getName();
 	
 	private static final int period = 30000;
 	
@@ -73,13 +73,11 @@ public class TwieberActivity extends ListActivity {
 		filter = new IntentFilter(UpdateReceiver.UPDATE_LIST);
 		filter.addCategory(Intent.CATEGORY_DEFAULT);
 		receiver = new UpdateReceiver();
-		registerReceiver(receiver, filter);
 	}
 	
 	//Creates handler for recurring updates
 	private void createHandler(){
 		handler = new Handler();
-		handler.post(regularUpdate);
 	}
 	
 	//Sets listener for the list cells onClick
@@ -104,7 +102,7 @@ public class TwieberActivity extends ListActivity {
 				showDialog = false;
 			}
 			startTwieberService();
-			handler.postDelayed(this, period);
+			handler.postDelayed(regularUpdate, period);
 		}
 	};
 	
@@ -153,7 +151,7 @@ public class TwieberActivity extends ListActivity {
 		Intent msgIntent = new Intent(this, TwieberService.class);
 		msgIntent.putExtra(TwieberService.HASH_TAG_IN, hashTag);
 		msgIntent.putExtra(TwieberService.MAX_ID_IN, maxID);
-		//Log.d(TAG, "Starting Service");
+		Log.d(TAG, "Starting Service");
 		startService(msgIntent);
 	}
 	
@@ -214,9 +212,7 @@ public class TwieberActivity extends ListActivity {
 		try {
 			handler.removeCallbacks(regularUpdate);
 			unregisterReceiver(receiver);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		} catch (Exception e) {}
 	}
 	
 	//On Resume, update and set recurring updates, register receiver
@@ -234,8 +230,6 @@ public class TwieberActivity extends ListActivity {
 		try {
 			handler.removeCallbacks(regularUpdate);
 			unregisterReceiver(receiver);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		} catch (Exception e) {}
 	}
 }

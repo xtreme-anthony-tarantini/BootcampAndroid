@@ -41,11 +41,16 @@ public class TwieberContentProvider extends ContentProvider {
 	public Uri insert(Uri uri, ContentValues values) {
 		SQLiteDatabase insertDB = twieberDB.getWritableDatabase();
 		int token = TwieberContentDescriptor.URI_MATCHER.match(uri);
+		long id;
 		switch(token){
 		case TwieberContentDescriptor.TweetDesc.PATH_TOKEN:
-			long id = insertDB.insert(TwieberContentDescriptor.TweetDesc.DB_TABLE, null, values);
-			getContext().getContentResolver().notifyChange(uri,  null);
+			id = insertDB.insert(TwieberContentDescriptor.TweetDesc.DB_TABLE, null, values);
+			getContext().getContentResolver().notifyChange(uri, null);
 			return TwieberContentDescriptor.TweetDesc.CONTENT_URI.buildUpon().appendPath(String.valueOf(id)).build();
+		case TwieberContentDescriptor.HashDesc.PATH_TOKEN:
+			id = insertDB.insert(TwieberContentDescriptor.HashDesc.DB_TABLE, null, values);
+			getContext().getContentResolver().notifyChange(uri, null);
+			return TwieberContentDescriptor.HashDesc.CONTENT_URI.buildUpon().appendPath(String.valueOf(id)).build();
 		default:
 			throw new UnsupportedOperationException("URI: " + uri + " not supported.");
 		}
@@ -56,10 +61,15 @@ public class TwieberContentProvider extends ContentProvider {
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 		SQLiteDatabase queryDB = twieberDB.getReadableDatabase();
 		final int match =  TwieberContentDescriptor.URI_MATCHER.match(uri);
+		SQLiteQueryBuilder builder;
 		switch(match){
 		case TwieberContentDescriptor.TweetDesc.PATH_TOKEN:
-			SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
+			builder = new SQLiteQueryBuilder();
 			builder.setTables(TwieberContentDescriptor.TweetDesc.DB_TABLE);
+			return builder.query(queryDB, projection, selection, selectionArgs, null, null, sortOrder);
+		case TwieberContentDescriptor.HashDesc.PATH_TOKEN:
+			builder = new SQLiteQueryBuilder();
+			builder.setTables(TwieberContentDescriptor.HashDesc.DB_TABLE);
 			return builder.query(queryDB, projection, selection, selectionArgs, null, null, sortOrder);
 		default:
 			return null;
@@ -72,10 +82,20 @@ public class TwieberContentProvider extends ContentProvider {
 		return 0;
 	}
 
-	//Update also not needed in this application
+	//Update maxID and date in the HashTable
 	@Override
-	public int update(Uri arg0, ContentValues arg1, String arg2, String[] arg3) {
-		return 0;
+	public int update(Uri uri, ContentValues values, String whereClause, String[] whereArgs) {
+		SQLiteDatabase updateDB = twieberDB.getWritableDatabase();
+		final int match = TwieberContentDescriptor.URI_MATCHER.match(uri);
+		long id;
+		switch(match){
+		case TwieberContentDescriptor.HashDesc.PATH_TOKEN:
+			id = updateDB.update(TwieberContentDescriptor.HashDesc.DB_TABLE, values, whereClause, whereArgs);
+			getContext().getContentResolver().notifyChange(uri, null);
+			return (int) id;
+		default:
+			return 0;
+		}
 	}
 
 }
